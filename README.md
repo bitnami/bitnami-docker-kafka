@@ -182,7 +182,8 @@ The configuration can easily be setup with the Bitnami Kafka Docker image using 
 
 - `ALLOW_PLAINTEXT_LISTENER`: Allow to use the PLAINTEXT listener. Default: **no**
 - `KAFKA_PORT_NUMBER`: Kafka port. Default: **9092**
-- `KAFKA_BROKER_ID`: ID of the Kafka node. Default: **-1**
+- `KAFKA_BROKER_ID`: ID of the Kafka node. Default: **-1**, unless `BROKER_ID_COMMAND` is set.
+- `BROKER_ID_COMMAND`: the command to issue in order to determine the ID of the Kafka node.  Ignored if `KAFKA_BROKER_ID` is of nonzero length.
 - `KAFKA_NUM_NETWORK_THREADS`: The number of threads handling network requests.
 - `KAFKA_NUM_IO_THREADS`: The number of threads doing disk I/O. Default: **3**
 - `KAFKA_SOCKET_SEND_BUFFER_BYTES`: The send buffer (SO_SNDBUF) used by the socket server. Default: **102400**
