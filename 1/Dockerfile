@@ -46,7 +46,7 @@ ENV ALLOW_PLAINTEXT_LISTENER="no" \
     PATH="/opt/bitnami/java/bin:/opt/bitnami/kafka/bin:$PATH"
 
 EXPOSE 9092
-
+RUN chown 1001:1001 /bitnami/kafka
 USER 1001
 ENTRYPOINT ["/app-entrypoint.sh"]
 CMD ["/run.sh"]
