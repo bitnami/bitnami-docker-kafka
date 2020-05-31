@@ -209,7 +209,7 @@ kafka_validate() {
         error "$1"
         error_code=1
     }
-    check_conflicting_ports() {
+    check_allowed_listener_port() {
         local -r total="$#"
         for i in $(seq 1 "$((total - 1))"); do
             for j in $(seq "$((i + 1))" "$total"); do
@@ -219,7 +219,7 @@ kafka_validate() {
             done
         done
     }
-    check_allowed_port() {
+    check_conflicting_listener_ports() {
         local validate_port_args=()
         ! am_i_root && validate_port_args+=("-unprivileged")
         if ! err=$(validate_port "${validate_port_args[@]}" "$1"); then
