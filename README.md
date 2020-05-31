@@ -644,7 +644,7 @@ $ docker-compose up kafka
 
 ### 2.5.0-debian-10-r51
 
-* The environment variable `KAFKA_CFG_PORT` was deprecated, use `KAFKA_CFG_LISTENERS` instead.
+* The environment variables `KAFKA_PORT_NUMBER` and `KAFKA_CFG_PORT` was deprecated, you can specify the port number in `KAFKA_CFG_LISTENERS` instead.
 * The following environment variables were renamed:
 
   * `KAFKA_BROKER_USER` -> `KAFKA_CLIENT_USER`

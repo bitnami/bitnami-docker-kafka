@@ -247,7 +247,7 @@ kafka_validate() {
         # DEPRECATED. Check for jks files in old conf directory to maintain compatibility with Helm chart.
         if ([[ ! -f "$KAFKA_BASE_DIR"/conf/certs/kafka.keystore.jks ]] || [[ ! -f "$KAFKA_BASE_DIR"/conf/certs/kafka.truststore.jks ]]) \
             && ([[ ! -f "$KAFKA_MOUNTED_CONF_DIR"/certs/kafka.keystore.jks ]] || [[ ! -f "$KAFKA_MOUNTED_CONF_DIR"/certs/kafka.truststore.jks ]]); then
-            print_validation_error "In order to configure the TLS encryption for Kafka you must mount your kafka.keystore.jks and kafka.truststore.jks certificates to the $KAFKA_MOUNTED_CONF_DIR/certs directory."
+            print_validation_error "In order to configure the TLS encryption for Kafka you must mount your kafka.keystore.jks and kafka.truststore.jks certificates to the ${KAFKA_MOUNTED_CONF_DIR}/certs directory."
         fi
     elif [[ "${KAFKA_CFG_LISTENERS:-}" =~ SASL ]] || [[ "${KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP:-}" =~ SASL ]]; then
         if [[ -z "$KAFKA_CLIENT_PASSWORD" ]] && [[ -z "$KAFKA_INTER_BROKER_PASSWORD" ]]; then
@@ -271,8 +271,8 @@ kafka_validate() {
 #   None
 #########################
 kafka_generate_jaas_authentication_file() {
-    local -r internal_protocol="${1:?missing environment variable internal_protocol}"
-    local -r client_protocol="${2:?missing environment variable client_protocol}"
+    local -r internal_protocol="${1:?missing internal_protocol}"
+    local -r client_protocol="${2:?missing client_protocol}"
 
     if [[ ! -f "${KAFKA_CONF_DIR}/kafka_jaas.conf" ]]; then
         info "Generating JAAS authentication file"
@@ -370,16 +370,17 @@ kafka_configure_ssl() {
 kafka_configure_internal_communications() {
     local -r protocol="${1:?missing environment variable protocol}"
     local -r allowed_protocols=("PLAINTEXT" "SASL_PLAINTEXT" "SASL_SSL" "SSL")
-    info "Configuring Kafka for inter-broker communications with $protocol authentication."
+    info "Configuring Kafka for inter-broker communications with ${protocol} authentication."
 
-    if [[ " ${allowed_protocols[@]} " =~ " $protocol " ]]; then
-        kafka_server_conf_set security.inter.broker.protocol $protocol
+    if [[ " ${allowed_protocols[@]} " =~ " ${protocol} " ]]; then
+        kafka_server_conf_set security.inter.broker.protocol "$protocol"
         if [[ "$protocol" = "PLAINTEXT" ]]; then
             warn "Inter-broker communications are configured as PLAINTEXT. This is not safe for production environments."
         fi
         if [[ "$protocol" = "SASL_PLAINTEXT" ]] || [[ "$protocol" = "SASL_SSL" ]]; then
-            # TODO (juan131): Support other SASL implementations (e.g. GSSAPI)
-            # Please do not confuse SASL/PLAIN with PLAINTEXT (see https://docs.confluent.io/current/kafka/authentication_sasl/authentication_sasl_plain.html#sasl-plain-overview)
+            # The below lines would need to be updated to support other SASL implementations (i.e. GSSAPI)
+            # IMPORTANT: Do not confuse SASL/PLAIN with PLAINTEXT
+            # For more information, see: https://docs.confluent.io/current/kafka/authentication_sasl/authentication_sasl_plain.html#sasl-plain-overview)
             kafka_server_conf_set sasl.mechanism.inter.broker.protocol PLAIN
         fi
         if [[ "$protocol" = "SASL_SSL" ]] || [[ "$protocol" = "SSL" ]]; then
@@ -389,7 +390,7 @@ kafka_configure_internal_communications() {
             kafka_server_conf_set ssl.client.auth required
         fi
     else
-        error "Authentication protocol $protocol is not supported!"
+        error "Authentication protocol ${protocol} is not supported!"
         exit 1
     fi
 }
@@ -406,12 +407,12 @@ kafka_configure_internal_communications() {
 kafka_configure_client_communications() {
     local -r protocol="${1:?missing environment variable protocol}"
     local -r allowed_protocols=("PLAINTEXT" "SASL_PLAINTEXT" "SASL_SSL" "SSL")
-    info "Configuring Kafka for client communications with $protocol authentication."
+    info "Configuring Kafka for client communications with ${protocol} authentication."
 
-    if [[ " ${allowed_protocols[@]} " =~ " $protocol " ]]; then
-        kafka_server_conf_set security.inter.broker.protocol $protocol
+    if [[ " ${allowed_protocols[@]} " =~ " ${protocol} " ]]; then
+        kafka_server_conf_set security.inter.broker.protocol "$protocol"
         if [[ "$protocol" = "PLAINTEXT" ]]; then
-            warn "Client communications are configured as PLAINTEXT. This is not safe for production environments."
+            warn "Client communications are configured using PLAINTEXT listeners. For safety reasons, do not use this in a production environment."
         fi
         if [[ "$protocol" = "SASL_PLAINTEXT" ]] || [[ "$protocol" = "SASL_SSL" ]]; then
             # The below lines would need to be updated to support other SASL implementations (i.e. GSSAPI)
@@ -426,7 +427,7 @@ kafka_configure_client_communications() {
             kafka_server_conf_set ssl.client.auth required
         fi
     else
-        error "Authentication protocol $protocol is not supported!"
+        error "Authentication protocol ${protocol} is not supported!"
         exit 1
     fi
 }
