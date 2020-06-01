@@ -227,15 +227,15 @@ kafka_validate() {
         fi
     }
 
-    if [[ ${KAFKA_CFG_LISTENERS:-} =~ INTERNAL:\/\/:([0-9]*) ]]; then
+    if [[ "${KAFKA_CFG_LISTENERS:-}" =~ INTERNAL:\/\/:([0-9]*) ]]; then
         internal_port="${BASH_REMATCH[1]}"
         check_allowed_listener_port "$internal_port"
     fi
-    if [[ ${KAFKA_CFG_LISTENERS:-} =~ CLIENT:\/\/:([0-9]*) ]]; then
+    if [[ "${KAFKA_CFG_LISTENERS:-}" =~ CLIENT:\/\/:([0-9]*) ]]; then
         client_port="${BASH_REMATCH[1]}"
         check_allowed_listener_port "$client_port"
     fi
-    [[ -n ${internal_port:-} && -n ${client_port:-} ]] && check_conflicting_listener_ports "$internal_port" "$client_port"
+    [[ -n "${internal_port:-}" && -n "${client_port:-}" ]] && check_conflicting_listener_ports "$internal_port" "$client_port"
     if [[ -n "${KAFKA_PORT_NUMBER:-}" ]] || [[ -n "${KAFKA_CFG_PORT:-}" ]]; then
         warn "The environment variables KAFKA_PORT_NUMBER and KAFKA_CFG_PORT are deprecated, you can specify the port number to use for each listener using the KAFKA_CFG_LISTENERS environment variable instead."
     fi
@@ -372,7 +372,7 @@ kafka_configure_internal_communications() {
     local -r allowed_protocols=("PLAINTEXT" "SASL_PLAINTEXT" "SASL_SSL" "SSL")
     info "Configuring Kafka for inter-broker communications with ${protocol} authentication."
 
-    if [[ " ${allowed_protocols[@]} " =~ " ${protocol} " ]]; then
+    if [[ " ${allowed_protocols[*]} " =~ " ${protocol} " ]]; then
         kafka_server_conf_set security.inter.broker.protocol "$protocol"
         if [[ "$protocol" = "PLAINTEXT" ]]; then
             warn "Inter-broker communications are configured as PLAINTEXT. This is not safe for production environments."
@@ -409,7 +409,7 @@ kafka_configure_client_communications() {
     local -r allowed_protocols=("PLAINTEXT" "SASL_PLAINTEXT" "SASL_SSL" "SSL")
     info "Configuring Kafka for client communications with ${protocol} authentication."
 
-    if [[ " ${allowed_protocols[@]} " =~ " ${protocol} " ]]; then
+    if [[ " ${allowed_protocols[*]} " =~ " ${protocol} " ]]; then
         kafka_server_conf_set security.inter.broker.protocol "$protocol"
         if [[ "$protocol" = "PLAINTEXT" ]]; then
             warn "Client communications are configured using PLAINTEXT listeners. For safety reasons, do not use this in a production environment."
