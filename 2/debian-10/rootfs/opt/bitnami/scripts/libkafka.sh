@@ -229,13 +229,13 @@ kafka_validate() {
 
     if [[ ${KAFKA_CFG_LISTENERS:-} =~ INTERNAL:\/\/:([0-9]*) ]]; then
         internal_port="${BASH_REMATCH[1]}"
-        check_allowed_port "$internal_port"
+        check_allowed_listener_port "$internal_port"
     fi
     if [[ ${KAFKA_CFG_LISTENERS:-} =~ CLIENT:\/\/:([0-9]*) ]]; then
         client_port="${BASH_REMATCH[1]}"
-        check_allowed_port "$client_port"
+        check_allowed_listener_port "$client_port"
     fi
-    [[ -n ${internal_port:-} && -n ${client_port:-} ]] && check_conflicting_ports "$internal_port" "$client_port"
+    [[ -n ${internal_port:-} && -n ${client_port:-} ]] && check_conflicting_listener_ports "$internal_port" "$client_port"
     if [[ -n "${KAFKA_PORT_NUMBER:-}" ]] || [[ -n "${KAFKA_CFG_PORT:-}" ]]; then
         warn "The environment variables KAFKA_PORT_NUMBER and KAFKA_CFG_PORT are deprecated, you can specify the port number to use for each listener using the KAFKA_CFG_LISTENERS environment variable instead."
     fi
