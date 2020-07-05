@@ -424,12 +424,11 @@ kafka_configure_client_communications() {
 }
 
 ########################
-# Generate JAAS authentication file
+# Generate JAAS authentication file for Zookeeper connection
 # Globals:
 #   KAFKA_*
 # Arguments:
-#   $1 - Authentication protocol to use for the internal listener
-#   $2 - Authentication protocol to use for the client listener
+#   None
 # Returns:
 #   None
 #########################
@@ -448,13 +447,13 @@ EOF
 }
 
 ########################
-# Configure Zookeeper SSL settings
+# Get Zookeeper SSL settings
 # Globals:
 #   ZOO_TLS_CLIENT_*
 # Arguments:
 #   None
 # Returns:
-#   None
+#   String
 #########################
 zookeeper_get_ssl_config() {
     # Note that ZooKeeper does not support a key password different from the keystore password, 
