@@ -112,11 +112,11 @@ export KAFKA_HEAP_OPTS="${KAFKA_HEAP_OPTS:-"-Xmx1024m -Xms1024m"}"
 export KAFKA_ZOOKEEPER_PASSWORD="${KAFKA_ZOOKEEPER_PASSWORD:-}"
 export KAFKA_ZOOKEEPER_USER="${KAFKA_ZOOKEEPER_USER:-}"
 export KAFKA_ZOOKEEPER_PROTOCOL="${KAFKA_ZOOKEEPER_PROTOCOL:-"SASL"}"
-export ZOO_TLS_CLIENT_KEYSTORE_FILE="${ZOO_TLS_CLIENT_KEYSTORE_FILE:-}"
-export ZOO_TLS_CLIENT_KEYSTORE_PASSWORD="${ZOO_TLS_CLIENT_KEYSTORE_PASSWORD:-}"
-export ZOO_TLS_CLIENT_TRUSTSTORE_FILE="${ZOO_TLS_CLIENT_TRUSTSTORE_FILE:-}"
-export ZOO_TLS_CLIENT_TRUSTSTORE_PASSWORD="${ZOO_TLS_CLIENT_TRUSTSTORE_PASSWORD:-}"
-export ZOO_TLS_CLIENT_VERIFY_HOSTNAME="${ZOO_TLS_CLIENT_VERIFY_HOSTNAME:-true}"
+export KAFKA_ZOOKEEPER_TLS_CLIENT_KEYSTORE_FILE="${KAFKA_ZOOKEEPER_TLS_CLIENT_KEYSTORE_FILE:-}"
+export KAFKA_ZOOKEEPER_TLS_CLIENT_KEYSTORE_PASSWORD="${KAFKA_ZOOKEEPER_TLS_CLIENT_KEYSTORE_PASSWORD:-}"
+export KAFKA_ZOOKEEPER_TLS_CLIENT_TRUSTSTORE_FILE="${KAFKA_ZOOKEEPER_TLS_CLIENT_TRUSTSTORE_FILE:-}"
+export KAFKA_ZOOKEEPER_TLS_CLIENT_TRUSTSTORE_PASSWORD="${KAFKA_ZOOKEEPER_TLS_CLIENT_TRUSTSTORE_PASSWORD:-}"
+export KAFKA_ZOOKEEPER_TLS_CLIENT_VERIFY_HOSTNAME="${KAFKA_ZOOKEEPER_TLS_CLIENT_VERIFY_HOSTNAME:-true}"
 export KAFKA_CFG_ADVERTISED_LISTENERS="${KAFKA_CFG_ADVERTISED_LISTENERS:-"PLAINTEXT://:9092"}"
 export KAFKA_CFG_LISTENERS="${KAFKA_CFG_LISTENERS:-"PLAINTEXT://:9092"}"
 export KAFKA_CFG_ZOOKEEPER_CONNECT="${KAFKA_CFG_ZOOKEEPER_CONNECT:-"localhost:2181"}"
@@ -279,48 +279,59 @@ kafka_generate_jaas_authentication_file() {
     local -r internal_protocol="${1:-}"
     local -r client_protocol="${2:-}"
 
-    info "Generating JAAS authentication file"
-    if [[ "${client_protocol:-}" =~ SASL ]]; then
-        cat >> "${KAFKA_CONF_DIR}/kafka_jaas.conf" <<EOF
+    if [[ ! -f "${KAFKA_CONF_DIR}/kafka_jaas.conf" ]]; then
+        info "Generating JAAS authentication file"
+        if [[ "${client_protocol:-}" =~ SASL ]]; then
+            cat >> "${KAFKA_CONF_DIR}/kafka_jaas.conf" <<EOF
 KafkaClient {
    org.apache.kafka.common.security.plain.PlainLoginModule required
    username="${KAFKA_CLIENT_USER:-}"
    password="${KAFKA_CLIENT_PASSWORD:-}";
    };
 EOF
-    fi
-    if [[ "${client_protocol:-}" =~ SASL ]] && [[ "${internal_protocol:-}" =~ SASL ]]; then
-        cat >> "${KAFKA_CONF_DIR}/kafka_jaas.conf" <<EOF
+        fi
+        if [[ "${client_protocol:-}" =~ SASL ]] && [[ "${internal_protocol:-}" =~ SASL ]]; then
+            cat >> "${KAFKA_CONF_DIR}/kafka_jaas.conf" <<EOF
 KafkaServer {
    org.apache.kafka.common.security.plain.PlainLoginModule required
    username="${KAFKA_INTER_BROKER_USER:-}"
    password="${KAFKA_INTER_BROKER_PASSWORD:-}"
    user_${KAFKA_INTER_BROKER_USER:-}="${KAFKA_INTER_BROKER_PASSWORD:-}"
    user_${KAFKA_CLIENT_USER:-}="${KAFKA_CLIENT_PASSWORD:-}";
-
    org.apache.kafka.common.security.scram.ScramLoginModule required;
    };
 EOF
-    elif [[ "${client_protocol:-}" =~ SASL ]]; then
-        cat >> "${KAFKA_CONF_DIR}/kafka_jaas.conf" <<EOF
+        elif [[ "${client_protocol:-}" =~ SASL ]]; then
+            cat >> "${KAFKA_CONF_DIR}/kafka_jaas.conf" <<EOF
 KafkaServer {
    org.apache.kafka.common.security.plain.PlainLoginModule required
    user_${KAFKA_CLIENT_USER:-}="${KAFKA_CLIENT_PASSWORD:-}";
-
    org.apache.kafka.common.security.scram.ScramLoginModule required;
    };
 EOF
-    elif [[ "${internal_protocol:-}" =~ SASL ]]; then
-        cat >> "${KAFKA_CONF_DIR}/kafka_jaas.conf" <<EOF
+        elif [[ "${internal_protocol:-}" =~ SASL ]]; then
+            cat >> "${KAFKA_CONF_DIR}/kafka_jaas.conf" <<EOF
 KafkaServer {
    org.apache.kafka.common.security.plain.PlainLoginModule required
    username="${KAFKA_INTER_BROKER_USER:-}"
    password="${KAFKA_INTER_BROKER_PASSWORD:-}"
    user_${KAFKA_INTER_BROKER_USER:-}="${KAFKA_INTER_BROKER_PASSWORD:-}";
-
    org.apache.kafka.common.security.scram.ScramLoginModule required;
    };
 EOF
+        fi
+        if [[ "${KAFKA_ZOOKEEPER_PROTOCOL}" =~ SASL ]] && [[ -n "$KAFKA_ZOOKEEPER_USER" ]] && [[ -n "$KAFKA_ZOOKEEPER_PASSWORD" ]]; then
+            cat >> "${KAFKA_CONF_DIR}/kafka_jaas.conf" <<EOF
+Client {
+   org.apache.kafka.common.security.plain.PlainLoginModule required
+   username="${KAFKA_ZOOKEEPER_USER:-}"
+   password="${KAFKA_ZOOKEEPER_PASSWORD:-}";
+   };
+EOF
+        fi
+    else
+        info "Custom JAAS authentication file detected. Skipping generation."
+        warn "The following environment variables will be ignored: KAFKA_CLIENT_USER, KAFKA_CLIENT_PASSWORD, KAFKA_INTER_BROKER_USER, KAFKA_INTER_BROKER_PASSWORD, KAFKA_ZOOKEEPER_USER and KAFKA_ZOOKEEPER_PASSWORD"
     fi
 }
 
@@ -424,29 +435,6 @@ kafka_configure_client_communications() {
 }
 
 ########################
-# Generate JAAS authentication file for Zookeeper connection
-# Globals:
-#   KAFKA_*
-# Arguments:
-#   None
-# Returns:
-#   None
-#########################
-zookeeper_generate_jaas_authentication_file() {
-     if [[ "${KAFKA_ZOOKEEPER_PROTOCOL}" =~ "SASL" ]]; then
-        if [[ -n "$KAFKA_ZOOKEEPER_USER" ]] && [[ -n "$KAFKA_ZOOKEEPER_PASSWORD" ]]; then
-            cat >> "${KAFKA_CONF_DIR}/kafka_jaas.conf" <<EOF
-Client {
-   org.apache.kafka.common.security.plain.PlainLoginModule required
-   username="${KAFKA_ZOOKEEPER_USER:-}"
-   password="${KAFKA_ZOOKEEPER_PASSWORD:-}";
-   };
-EOF
-        fi
-     fi
-}
-
-########################
 # Get Zookeeper SSL settings
 # Globals:
 #   ZOO_TLS_CLIENT_*
@@ -461,11 +449,11 @@ zookeeper_get_ssl_config() {
     # otherwise the connection attempt to Zookeeper will fail.
     echo "-Dzookeeper.clientCnxnSocket=org.apache.zookeeper.ClientCnxnSocketNetty \
           -Dzookeeper.client.secure=true \
-          -Dzookeeper.ssl.keyStore.location=$ZOO_TLS_CLIENT_KEYSTORE_FILE \
-          -Dzookeeper.ssl.keyStore.password=$ZOO_TLS_CLIENT_KEYSTORE_PASSWORD \
-          -Dzookeeper.ssl.trustStore.location=$ZOO_TLS_CLIENT_TRUSTSTORE_FILE \
-          -Dzookeeper.ssl.trustStore.password=$ZOO_TLS_CLIENT_TRUSTSTORE_PASSWORD \
-          -Dzookeeper.ssl.hostnameVerification=$ZOO_TLS_CLIENT_VERIFY_HOSTNAME"
+          -Dzookeeper.ssl.keyStore.location=$KAFKA_ZOOKEEPER_TLS_CLIENT_KEYSTORE_FILE \
+          -Dzookeeper.ssl.keyStore.password=$KAFKA_ZOOKEEPER_TLS_CLIENT_KEYSTORE_PASSWORD \
+          -Dzookeeper.ssl.trustStore.location=$KAFKA_ZOOKEEPER_TLS_CLIENT_TRUSTSTORE_FILE \
+          -Dzookeeper.ssl.trustStore.password=$KAFKA_ZOOKEEPER_TLS_CLIENT_TRUSTSTORE_PASSWORD \
+          -Dzookeeper.ssl.hostnameVerification=$KAFKA_ZOOKEEPER_TLS_CLIENT_VERIFY_HOSTNAME"
 }
 
 ########################
@@ -527,15 +515,9 @@ kafka_initialize() {
                 kafka_configure_client_communications "$client_protocol"
             fi
         fi
-        if [[ "${internal_protocol:-}" =~ SASL ]] || [[ "${client_protocol:-}" =~ SASL ]] || [[ -n "$KAFKA_ZOOKEEPER_USER" && -n "$KAFKA_ZOOKEEPER_PASSWORD" ]]; then
+        if [[ "${internal_protocol:-}" =~ SASL ]] || [[ "${client_protocol:-}" =~ SASL ]] || [[ "${KAFKA_ZOOKEEPER_PROTOCOL}" =~ SASL ]]; then
             kafka_server_conf_set sasl.enabled.mechanisms PLAIN,SCRAM-SHA-256,SCRAM-SHA-512
-            if [[ -f "${KAFKA_CONF_DIR}/kafka_jaas.conf" ]]; then
-                info "Custom JAAS authentication file detected. Skipping generation."
-                warn "The following environment variables will be ignored: KAFKA_CLIENT_USER, KAFKA_CLIENT_PASSWORD, KAFKA_INTER_BROKER_USER, KAFKA_INTER_BROKER_PASSWORD, KAFKA_ZOOKEEPER_USER and KAFKA_ZOOKEEPER_PASSWORD"
-            else
-                kafka_generate_jaas_authentication_file "${internal_protocol:-}" "${client_protocol:-}"
-                zookeeper_generate_jaas_authentication_file
-            fi
+            kafka_generate_jaas_authentication_file "${internal_protocol:-}" "${client_protocol:-}"
         fi
         # Remove security.inter.broker.protocol if KAFKA_CFG_INTER_BROKER_LISTENER_NAME is configured
         if [[ -n "${KAFKA_CFG_INTER_BROKER_LISTENER_NAME:-}" ]]; then
