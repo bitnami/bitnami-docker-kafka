@@ -196,6 +196,9 @@ The configuration can easily be setup with the Bitnami Kafka Docker image using 
 * `KAFKA_ZOOKEEPER_TLS_KEYSTORE_PASSWORD`: Kafka Zookeeper keystore file password and key password. No defaults.
 * `KAFKA_ZOOKEEPER_TLS_TRUSTSTORE_PASSWORD`: Kafka Zookeeper truststore file password. No defaults.
 * `KAFKA_ZOOKEEPER_TLS_VERIFY_HOSTNAME`: Verify Zookeeper hostname on TLS certificates. Defaults: **true**.
+* `KAFKA_CFG_SASL_ENABLED_MECHANISMS`: Allowed mechanism when using SASL either for clients, inter broker, or zookeeper comunications. Allowed values: `PLAIN`, `SCRAM-SHA-256`, `SCRAM-SHA-512` or a comma separated combination of those values..
+* `KAFKA_CLIENT_USERS`: Additional users to `KAFKA_CLIENT_USER` that will be created into Zookeeper when using SASL_SCRAM for client communications. Separated by commas. No defaults.
+* `KAFKA_CLIENT_PASSWORDS`: Passwords for the users specified at`KAFKA_CLIENT_USERS`. Separated by commas. No defaults.
 
 Additionally, any environment variable beginning with `KAFKA_CFG_` will be mapped to its corresponding Kafka key. For example, use `KAFKA_CFG_BACKGROUND_THREADS` in order to set `background.threads` or `KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE` in order to configure `auto.create.topics.enable`.
 

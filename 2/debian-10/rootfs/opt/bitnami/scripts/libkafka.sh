@@ -119,6 +119,10 @@ export KAFKA_CFG_ADVERTISED_LISTENERS="${KAFKA_CFG_ADVERTISED_LISTENERS:-"PLAINT
 export KAFKA_CFG_LISTENERS="${KAFKA_CFG_LISTENERS:-"PLAINTEXT://:9092"}"
 export KAFKA_CFG_ZOOKEEPER_CONNECT="${KAFKA_CFG_ZOOKEEPER_CONNECT:-"localhost:2181"}"
 export KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE="${KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE:-"true"}"
+export KAFKA_CFG_SASL_ENABLED_MECHANISMS="${KAFKA_CFG_SASL_ENABLED_MECHANISMS:-}"
+export KAFKA_CFG_SASL_MECHANISM_INTER_BROKER_PROTOCOL="${KAFKA_CFG_SASL_MECHANISM_INTER_BROKER_PROTOCOL:-}"
+export KAFKA_CLIENT_USERS="${KAFKA_CLIENT_USERS:-}"
+export KAFKA_CLIENT_PASSWORDS="${KAFKA_CLIENT_PASSWORDS:-}"
 EOF
 }
 
@@ -242,6 +246,16 @@ kafka_validate() {
     [[ -n ${internal_port:-} && -n ${client_port:-} ]] && check_conflicting_listener_ports "$internal_port" "$client_port"
     if [[ -n "${KAFKA_PORT_NUMBER:-}" ]] || [[ -n "${KAFKA_CFG_PORT:-}" ]]; then
         warn "The environment variables KAFKA_PORT_NUMBER and KAFKA_CFG_PORT are deprecated, you can specify the port number to use for each listener using the KAFKA_CFG_LISTENERS environment variable instead."
+    fi
+
+    read -r -a users <<< "$(tr ',;' ' ' <<< "${KAFKA_CLIENT_USERS}")"
+    read -r -a passwords <<< "$(tr ',;' ' ' <<< "${KAFKA_CLIENT_PASSWORDS}")"
+    if [[ "${#users[@]}" -ne "${#passwords[@]}" ]]; then
+        print_validation_error "Specify the same number of passwords on KAFKA_CLIENT_PASSWORDS as the number of users on KAFKA_CLIENT_USERS!"
+    fi
+
+    if [[ "$protocol" = "SASL_PLAINTEXT" ]] || [[ "$protocol" = "SASL_SSL" ]]; then
+        [[ -z "$KAFKA_CFG_SASL_MECHANISM_INTER_BROKER_PROTOCOL" ]] && print_validation_error "When using SASL for inter broker comunication the mechanism should be provided at KAFKA_CFG_SASL_MECHANISM_INTER_BROKER_PROTOCOL"
     fi
 
     if is_boolean_yes "$ALLOW_PLAINTEXT_LISTENER"; then
@@ -429,7 +443,7 @@ kafka_configure_client_communications() {
             # The below lines would need to be updated to support other SASL implementations (i.e. GSSAPI)
             # IMPORTANT: Do not confuse SASL/PLAIN with PLAINTEXT
             # For more information, see: https://docs.confluent.io/current/kafka/authentication_sasl/authentication_sasl_plain.html#sasl-plain-overview)
-            kafka_server_conf_set sasl.mechanism.inter.broker.protocol PLAIN
+            kafka_server_conf_set sasl.mechanism.inter.broker.protocol "$KAFKA_CFG_SASL_MECHANISM_INTER_BROKER_PROTOCOL"
         fi
         if [[ "$protocol" = "SASL_SSL" ]] || [[ "$protocol" = "SSL" ]]; then
             kafka_configure_ssl
@@ -524,14 +538,20 @@ kafka_initialize() {
                 kafka_configure_client_communications "$client_protocol"
             fi
         fi
-        if [[ "${internal_protocol:-}" =~ SASL ]] || [[ "${client_protocol:-}" =~ SASL ]] || [[ "${KAFKA_ZOOKEEPER_PROTOCOL}" =~ SASL ]]; then
-            kafka_server_conf_set sasl.enabled.mechanisms PLAIN,SCRAM-SHA-256,SCRAM-SHA-512
+        if [[ -n "$KAFKA_CFG_SASL_ENABLED_MECHANISMS" ]]; then
+            kafka_server_conf_set sasl.enabled.mechanisms "$KAFKA_CFG_SASL_ENABLED_MECHANISMS"
             kafka_generate_jaas_authentication_file "${internal_protocol:-}" "${client_protocol:-}"
+        else
+            if [[ "$internal_protocol" =~ "SASL" || "$client_protocol" =~ "SASL" ]]  || [[ "${KAFKA_ZOOKEEPER_PROTOCOL}" =~ SASL ]]; then
+                print_validation_error "Specified SASL protocol but no SASL mechanisms provided in KAFKA_CFG_SASL_ENABLED_MECHANISMS"
+            fi
         fi
         # Remove security.inter.broker.protocol if KAFKA_CFG_INTER_BROKER_LISTENER_NAME is configured
         if [[ -n "${KAFKA_CFG_INTER_BROKER_LISTENER_NAME:-}" ]]; then
             remove_in_file "$KAFKA_CONF_FILE" "security.inter.broker.protocol" false
         fi
+
+        [[ "$KAFKA_CFG_SASL_ENABLED_MECHANISMS" =~ "SCRAM" ]] && kafka_create_sasl_scram_zookeeper_users
     fi
 }
 
@@ -568,4 +588,27 @@ kafka_custom_init_scripts() {
         done
         touch "$KAFKA_VOLUME_DIR"/.user_scripts_initialized
     fi
+}
+
+########################
+# Create users in zookeper when using SASL_SCRAM
+# Globals:
+#   KAFKA_*
+# Arguments:
+#   None
+# Returns:
+#   None
+#########################
+kafka_create_sasl_scram_zookeeper_users() {
+    export KAFKA_OPTS="-Djava.security.auth.login.config=${KAFKA_CONF_DIR}/kafka_jaas.conf"
+    info "Creating users in Zookeeper"
+    kafka-configs.sh --zookeeper "$KAFKA_CFG_ZOOKEEPER_CONNECT" --alter --add-config "SCRAM-SHA-256=[iterations=8192,password=${KAFKA_CLIENT_PASSWORD}],SCRAM-SHA-512=[password=${KAFKA_CLIENT_PASSWORD}]" --entity-type users --entity-name "${KAFKA_CLIENT_USER}"
+
+    info "Creating additional users in Zookeeper"
+    read -r -a users <<< "$(tr ',;' ' ' <<< "${KAFKA_CLIENT_USERS}")"
+    read -r -a passwords <<< "$(tr ',;' ' ' <<< "${KAFKA_CLIENT_PASSWORDS}")"
+    for (( i=0; i<${#users[@]}; i++ )); do
+        echo "Creating user ${users[i]} in zookeeper"
+        kafka-configs.sh --zookeeper "$KAFKA_CFG_ZOOKEEPER_CONNECT" --alter --add-config "SCRAM-SHA-256=[iterations=8192,password=${passwords[i]}],SCRAM-SHA-512=[password=${passwords[i]}]" --entity-type users --entity-name "${users[i]}"
+    done
 }
