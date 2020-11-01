@@ -266,11 +266,13 @@ To do so, add the following environment variables to your docker-compose:
 +     - KAFKA_INTER_BROKER_LISTENER_NAME=CLIENT
 ```
 
-And expose the extra port:
+And expose the external port:
+
+(the internal, client one can still be used within the docker network) 
 
 ```diff
     ports:
-      - '9092:9092'
+-     - '9092:9092'
 +     - '9093:9093'
 ```
 
@@ -279,17 +281,17 @@ And expose the extra port:
 These clients will use localhost to connect to Kafka.
 
 ```console
-kafka-console-producer.sh --broker-list 127.0.0.1:9092 --topic test
-kafka-console-consumer.sh --bootstrap-server 127.0.0.1:9092 --topic test --from-beginning
+kafka-console-producer.sh --broker-list 127.0.0.1:9093 --topic test
+kafka-console-consumer.sh --bootstrap-server 127.0.0.1:9093 --topic test --from-beginning
 ```
 
 #### Producer and consumer using external client
 
-These clients will use the docker hostname to connect to Kafka.
+These clients will use the kafka container service hostname to connect to Kafka.
 
 ```console
-kafka-console-producer.sh --broker-list kafka:9093 --topic test
-kafka-console-consumer.sh --bootstrap-server kafka:9093 --topic test --from-beginning
+kafka-console-producer.sh --broker-list kafka:9092 --topic test
+kafka-console-consumer.sh --bootstrap-server kafka:9092 --topic test --from-beginning
 ```
 
 More info about Kafka listeners can be found in [this great article](https://rmoff.net/2018/08/02/kafka-listeners-explained/)
@@ -306,7 +308,6 @@ In order to configure authentication, you must configure the Kafka listeners pro
 
 * INTERNAL: used for inter-broker communications.
 * CLIENT: used for coummunications with clients that are within the same network as Kafka brokers.
-* EXTERNAL: used for communications with clients that are on a different network.
 
 Let's see an example to configure Kafka with `SASL_SSL` authentication for communications with clients, and `SSL` authentication for inter-broker communication.
 
