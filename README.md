@@ -276,23 +276,25 @@ And expose the external port:
 +     - '9093:9093'
 ```
 
-#### Producer and consumer using internal client
+#### Producer and consumer using external client
 
-These clients will use localhost to connect to Kafka.
+These clients, from the host, will use `localhost` to connect to Kafka.
 
 ```console
 kafka-console-producer.sh --broker-list 127.0.0.1:9093 --topic test
 kafka-console-consumer.sh --bootstrap-server 127.0.0.1:9093 --topic test --from-beginning
 ```
 
-#### Producer and consumer using external client
+#### Producer and consumer using internal client
 
-These clients will use the kafka container service hostname to connect to Kafka.
+These clients, from other containers on the same Docker network, will use the kafka container service hostname to connect to Kafka.
 
 ```console
 kafka-console-producer.sh --broker-list kafka:9092 --topic test
 kafka-console-consumer.sh --bootstrap-server kafka:9092 --topic test --from-beginning
 ```
+
+Similarly, application code will need to use `bootstrap.servers=kafka:9092`
 
 More info about Kafka listeners can be found in [this great article](https://rmoff.net/2018/08/02/kafka-listeners-explained/)
 
